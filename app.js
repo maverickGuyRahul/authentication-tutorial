@@ -1,16 +1,16 @@
 import 'dotenv/config';
-console.log(process.env);
+// console.log(process.env);
 
 import express from 'express' ;
 import bodyParser from 'body-parser' ;
 import ejs from "ejs";
 import mongoose from 'mongoose';
-import encrypt from 'mongoose-encryption';
+import bcrypt from "bcrypt";
 
 
 const app = express();
 const port = 3000;
-
+const saltRounds = 10;
 // console.log(process.env.SECRET);
 
 app.use(express.static("public"));
@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
 });
 
 
-userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] });
+// userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] });
 
 const User = mongoose.model("User" , userSchema);
 
@@ -37,18 +37,28 @@ app.get("/register" , (req, res) => {
     res.render("register");
 });
 
+// console.log(md5('password'));
+
 app.post("/register" , (req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
 
-    const user = new User({
-        email : username,
-        password : password
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        const user = new User({
+            email : req.body.username,
+            password : hash
+        });
+
+        user.save();
+
+        if(err)
+        {
+            console.log("There is an error");
+        }
+        else
+        {
+            res.render("secrets");
+        }
     });
-
-    user.save();
-
-    res.render("secrets");
+    
 });
 
 app.get("/login" , (req, res) => {
@@ -59,16 +69,23 @@ app.post("/login" , async (req, res) => {
     const username = req.body.username;
     const password = req.body.password;
 
-
-        const userFound = await User.findOne({email : username});
+    const userFound = await User.findOne({email : username});
     
-        if(userFound)
-        {
-            if(userFound.password === password)
+    if(userFound)
+    {
+        bcrypt.compare(password, userFound.password, function(err, result) {
+            if(result == true)
             {
                 res.render("secrets");
             }
-        }
+            if(err)
+            {
+                console.log(err.message);
+            }
+        });
+
+        
+    }
     
 });
 
